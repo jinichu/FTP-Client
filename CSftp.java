@@ -86,6 +86,7 @@ public class CSftp {
             continue outer;
           } else {
             System.out.println("TODO: cd stuff");
+            changeDirectory(parts[1]);
             continue outer;
           }
         case "dir":
@@ -95,5 +96,10 @@ public class CSftp {
           System.out.println("0x001 Invalid command.");
       }
     }
+  }
+
+  private static void changeDirectory(String dir) {
+    System.setProperty("user.dir", dir);
+    System.out.println("Changed directory to " + dir);
   }
 }
