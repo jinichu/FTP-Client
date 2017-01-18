@@ -1,6 +1,7 @@
 
 import java.lang.System;
 import java.io.IOException;
+import java.io.Console;
 import java.net.Socket;
 
 //
@@ -30,25 +31,38 @@ public class CSftp
 	Socket client;
 
 	try {
-	client = new Socket(args[0], Integer.parseInt(args[1]));
+	    client = new Socket(args[0], Integer.parseInt(args[1]));
 	} catch (Exception exception) {
 	    System.err.println("0x398 Failed to open socket to server");
 	    System.exit(1);
 	}
 
-	try {
-	    for (int len = 1; len > 0;) {
-		System.out.print("csftp> ");
-		len = System.in.read(cmdString);
-		if (len <= 0) {
-		    break;
-		}
-		// Start processing the command here.
-		System.out.println("900 Invalid command.");
-	    }
-	} catch (IOException exception) {
+        Console c = System.console();
+	if (c == null) {
 	    System.err.println("998 Input error while reading commands, terminating.");
 	    System.exit(1);
+	}
+
+outer:
+	while (true) {
+	    String line = c.readLine("csftp> ");
+	    if (line.length() == 0) {
+		System.out.println("900 Invalid command.");
+		continue;
+	    }
+	    String parts[] = line.split(" ");
+	    if (parts.length == 0) {
+		System.out.println("900 Invalid command.");
+		continue;
+	    }
+	    String cmd = parts[0];
+	    switch (cmd) {
+	    case "quit":
+		System.out.println("TODO");
+		continue outer;
+	    default:
+		System.out.println("900 Invalid command.");
+	    }
 	}
     }
 }
