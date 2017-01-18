@@ -66,7 +66,7 @@ public class CSftp {
             System.out.println("0x002 Incorrect number of arguments.");
             continue outer;
           } else {
-            System.out.println("TODO: user stuff");
+            System.out.println(sendSimpleCommand("USER "+parts[1]));
             continue outer;
           }
         case "pw":
@@ -74,7 +74,7 @@ public class CSftp {
             System.out.println("0x002 Incorrect number of arguments.");
             continue outer;
           } else {
-            System.out.println("TODO: pw stuff");
+            System.out.println(sendSimpleCommand("PASS "+parts[1]));
             continue outer;
           }
         case "get":
@@ -86,7 +86,7 @@ public class CSftp {
             continue outer;
           }
         case "features":
-          System.out.println("TODO: fEaTuREs");
+          System.out.println(sendSimpleCommand("FEAT"));
           continue outer;
         case "cd":
           if (parts.length != 2) {
@@ -103,6 +103,12 @@ public class CSftp {
           System.out.println("0x001 Invalid command.");
       }
     }
+  }
+
+  private static String sendSimpleCommand(String cmd) {
+    out.print(cmd+"\r\n");
+    out.flush();
+    return readMessage();
   }
 
   private static String readMessage() {
