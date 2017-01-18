@@ -14,7 +14,6 @@ import java.io.InputStreamReader;
 
 
 public class CSftp {
-
   static final int MAX_LEN = 255;
   static final int ARG_CNT = 2;
 
@@ -45,29 +44,63 @@ public class CSftp {
 
     Console c = System.console();
     if (c == null) {
-      System.err.println("998 Input error while reading commands, terminating.");
+      System.err.println("0xFFFE Input error while reading commands, terminating.");
       System.exit(1);
     }
 
     outer:
     while (true) {
       String line = c.readLine("csftp> ");
-      if (line.length() == 0) {
-        System.out.println("900 Invalid command.");
-        continue;
-      }
       String parts[] = line.split(" ");
       if (parts.length == 0) {
-        System.out.println("900 Invalid command.");
+        System.out.println("0x001 Invalid command.");
         continue;
       }
       String cmd = parts[0];
       switch (cmd) {
         case "quit":
-          System.out.println("TODO");
+          System.out.println("Goodbye.");
+          System.exit(0);
+        case "user":
+          if (parts.length != 2) {
+            System.out.println("0x002 Incorrect number of arguments.");
+            continue outer;
+          } else {
+            System.out.println("TODO: user stuff");
+            continue outer;
+          }
+        case "pw":
+          if (parts.length != 2) {
+            System.out.println("0x002 Incorrect number of arguments.");
+            continue outer;
+          } else {
+            System.out.println("TODO: pw stuff");
+            continue outer;
+          }
+        case "get":
+          if (parts.length != 2) {
+            System.out.println("0x002 Incorrect number of arguments.");
+            continue outer;
+          } else {
+            System.out.println("TODO: get stuff");
+            continue outer;
+          }
+        case "features":
+          System.out.println("TODO: fEaTuREs");
+          continue outer;
+        case "cd":
+          if (parts.length != 2) {
+            System.out.println("0x002 Incorrect number of arguments.");
+            continue outer;
+          } else {
+            System.out.println("TODO: cd stuff");
+            continue outer;
+          }
+        case "dir":
+          System.out.println("TODO: fEaTuREs");
           continue outer;
         default:
-          System.out.println("900 Invalid command.");
+          System.out.println("0x001 Invalid command.");
       }
     }
   }
