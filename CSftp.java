@@ -1,8 +1,11 @@
 
-import java.lang.System;
-import java.io.IOException;
+import java.io.BufferedReader;
 import java.io.Console;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.lang.System;
 import java.net.Socket;
+import java.io.InputStreamReader;
 
 //
 // This is an implementation of a simplified version of a command
@@ -14,7 +17,11 @@ public class CSftp {
 
   static final int MAX_LEN = 255;
   static final int ARG_CNT = 2;
-  
+
+  static Socket client;
+  static PrintWriter out = null;
+  static BufferedReader in = null;
+
   public static void main(String [] args) {
     // Get command line arguments and connected to FTP
     // If the arguments are invalid or there aren't enough of them
@@ -25,14 +32,16 @@ public class CSftp {
       return;
     }
 
-    Socket client;
-
     try {
       client = new Socket(args[0], Integer.parseInt(args[1]));
+      out = new PrintWriter(client.getOutputStream(), true);
+      in = new BufferedReader(new InputStreamReader(client.getInputStream()));
     } catch (Exception exception) {
       System.err.println("0x398 Failed to open socket to server");
       System.exit(1);
     }
+
+    System.out.println(readMessage());
 
     Console c = System.console();
     if (c == null) {
@@ -55,11 +64,21 @@ public class CSftp {
       String cmd = parts[0];
       switch (cmd) {
         case "quit":
-        System.out.println("TODO");
-        continue outer;
+          System.out.println("TODO");
+          continue outer;
         default:
-        System.out.println("900 Invalid command.");
+          System.out.println("900 Invalid command.");
       }
     }
+  }
+
+  private static String readMessage() {
+    try {
+      return in.readLine();
+    } catch (IOException e) {
+      System.out.println("TODO error reading from server");
+      System.exit(1);
+    }
+    return "";
   }
 }
