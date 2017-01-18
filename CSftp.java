@@ -1,9 +1,10 @@
 
 import java.lang.System;
 import java.io.IOException;
+import java.net.Socket;
 
 //
-// This is an implementation of a simplified version of a command 
+// This is an implementation of a simplified version of a command
 // line ftp client. The program always takes two arguments
 //
 
@@ -26,17 +27,28 @@ public class CSftp
 	    return;
 	}
 
+	Socket client;
+
+	try {
+	client = new Socket(args[0], Integer.parseInt(args[1]));
+	} catch (Exception exception) {
+	    System.err.println("0x398 Failed to open socket to server");
+	    System.exit(1);
+	}
+
 	try {
 	    for (int len = 1; len > 0;) {
 		System.out.print("csftp> ");
 		len = System.in.read(cmdString);
-		if (len <= 0) 
+		if (len <= 0) {
 		    break;
+		}
 		// Start processing the command here.
 		System.out.println("900 Invalid command.");
 	    }
 	} catch (IOException exception) {
 	    System.err.println("998 Input error while reading commands, terminating.");
+	    System.exit(1);
 	}
     }
 }
