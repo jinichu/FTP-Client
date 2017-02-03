@@ -40,7 +40,7 @@ public class CSftp {
       System.exit(1);
     }
 
-    System.out.println(readMessage());
+    System.out.println(readMessage(""));
 
     Console c = System.console();
     if (c == null) {
@@ -61,6 +61,7 @@ public class CSftp {
         case "quit":
           System.out.println("Goodbye.");
           System.exit(0);
+          break;
         case "user":
           if (parts.length != 2) {
             System.out.println("0x002 Incorrect number of arguments.");
@@ -86,7 +87,7 @@ public class CSftp {
             continue outer;
           }
         case "features":
-          System.out.println(sendSimpleCommand("FEAT"));
+          System.out.println(sendSimpleCommand("FEAT", "211 End"));
           continue outer;
         case "cd":
           if (parts.length != 2) {
@@ -97,7 +98,17 @@ public class CSftp {
             continue outer;
           }
         case "dir":
-          System.out.println("TODO: fEaTuREs");
+          Socket sock = PASV();
+          System.out.println(sendSimpleCommand("LIST"));
+          try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()));
+            String line2;
+            while ((line2 = in.readLine()) != null) {
+              System.out.println(line2);
+            }
+          } catch (IOException err) {
+            System.out.println("0x3A7 Data transfer connection I/O error, closing data connection.");
+          }
           continue outer;
         default:
           System.out.println("0x001 Invalid command.");
@@ -105,19 +116,64 @@ public class CSftp {
     }
   }
 
-  private static String sendSimpleCommand(String cmd) {
-    out.print(cmd+"\r\n");
-    out.flush();
-    return readMessage();
+  private static Socket PASV() {
+    String resp = sendSimpleCommand("PASV");
+    System.out.println(resp);
+    int start = resp.indexOf("(");
+    int end = resp.indexOf(")");
+    if (start == -1 || end == -1) {
+      throw new Error("0xFFFF Processing error. Response missing (): "+resp);
+    }
+    String portRegion = resp.substring(start+1, end);
+    String[] parts = portRegion.split(",");
+    if (parts.length != 6) {
+      throw new Error("0xFFFF Processing error. Invalid parts length: "+resp);
+    }
+
+    // Build IP into usable format.
+    String ip = parts[0];
+    for (int i=1;i<4;i++) {
+      ip += "." + parts[i];
+    }
+
+    int port = Integer.parseInt(parts[4])*256 + Integer.parseInt(parts[5]);
+    System.out.println("IP: "+ip+", port: "+port);
+
+    try {
+      return new Socket(ip, port);
+    } catch (Exception exception) {
+      throw new Error("0x3A2 Data transfer connection to "+ip+" on port "+port+" failed to open.");
+    }
   }
 
-  private static String readMessage() {
+  // sendSimpleCommand sends the command and returns the first line of the
+  // response.
+  private static String sendSimpleCommand(String cmd) {
+    return sendSimpleCommand(cmd, "");
+  }
+
+  // sendSimpleCommand sends the command and returns the response until end is
+  // seen, or the first line if end is empty.
+  private static String sendSimpleCommand(String cmd, String end) {
+    out.print(cmd+"\r\n");
+    out.flush();
+    return readMessage(end);
+  }
+
+  private static String readMessage(String end) {
+    String output = "";
+    String line;
     try {
-      return in.readLine();
+      while ((line = in.readLine()) != null) {
+        output += line+"\n";
+        if (line.equals(end) || end.length() == 0) {
+          break;
+        }
+      }
     } catch (IOException e) {
       System.out.println("TODO error reading from server");
       System.exit(1);
     }
-    return "";
+    return output;
   }
 }
