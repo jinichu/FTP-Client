@@ -1,11 +1,15 @@
-
 import java.io.BufferedReader;
 import java.io.Console;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.lang.System;
 import java.net.Socket;
-import java.io.InputStreamReader;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 //
 // This is an implementation of a simplified version of a command
@@ -36,7 +40,7 @@ public class CSftp {
       out = new PrintWriter(client.getOutputStream(), true);
       in = new BufferedReader(new InputStreamReader(client.getInputStream()));
     } catch (Exception exception) {
-      System.err.println("0x398 Failed to open socket to server");
+      System.out.println("0x398 Failed to open socket to server");
       System.exit(1);
     }
 
@@ -59,7 +63,12 @@ public class CSftp {
       String cmd = parts[0];
       switch (cmd) {
         case "quit":
-          System.out.println("Goodbye.");
+          System.out.println(sendSimpleCommand("QUIT"));
+          try {
+            client.close();
+          } catch(IOException e) {
+            System.out.println("0xFFFF Processing error. Failed to close control connection.");
+          }
           System.exit(0);
           break;
         case "user":
@@ -83,7 +92,39 @@ public class CSftp {
             System.out.println("0x002 Incorrect number of arguments.");
             continue outer;
           } else {
-            System.out.println("TODO: get stuff");
+            File f = new File(parts[1]);
+            if (!f.canWrite()) {
+              System.out.println("0x38E Access to local file "+parts[1]+" denied.");
+              continue outer;
+            }
+
+            Socket sock;
+            try {
+              sock = PASV();
+            } catch (Error e) {
+              System.out.println(e.getMessage());
+              continue outer;
+            }
+
+            String resp = sendSimpleCommand("RETR "+parts[1]);
+            System.out.println(resp);
+            if (responseCode(resp) != 150) {
+              continue outer;
+            }
+
+            try {
+              Files.copy(sock.getInputStream(), f.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException err) {
+              System.out.println("0x3A7 Data transfer connection I/O error, closing data connection. "+err);
+            }
+            try {
+              sock.close();
+            } catch (IOException err) {
+              System.out.println("0xFFFF Processing error. Failed to close data connection.");
+            }
+            if (hasMultipleResp(resp)) {
+              System.out.println(readMessage(""));
+            }
             continue outer;
           }
         case "features":
@@ -94,12 +135,19 @@ public class CSftp {
             System.out.println("0x002 Incorrect number of arguments.");
             continue outer;
           } else {
-            System.out.println("TODO: cd stuff");
+            System.out.println(sendSimpleCommand("CWD "+parts[1]));
             continue outer;
           }
         case "dir":
-          Socket sock = PASV();
-          System.out.println(sendSimpleCommand("LIST"));
+          Socket sock;
+          try {
+            sock = PASV();
+          } catch (Error e) {
+            System.out.println(e.getMessage());
+            continue outer;
+          }
+          String resp = sendSimpleCommand("LIST");
+          System.out.println(resp);
           try {
             BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()));
             String line2;
@@ -109,6 +157,14 @@ public class CSftp {
           } catch (IOException err) {
             System.out.println("0x3A7 Data transfer connection I/O error, closing data connection.");
           }
+          try {
+            sock.close();
+          } catch (IOException err) {
+            System.out.println("0xFFFF Processing error. Failed to close data connection.");
+          }
+          if (hasMultipleResp(resp)) {
+            System.out.println(readMessage(""));
+          }
           continue outer;
         default:
           System.out.println("0x001 Invalid command.");
@@ -116,8 +172,17 @@ public class CSftp {
     }
   }
 
+  // PASV opens a new passive data connection and returns the corresponding
+  // socket.
   private static Socket PASV() {
     String resp = sendSimpleCommand("PASV");
+
+    // Check for valid response code.
+    int code = responseCode(resp);
+    if (code != 227) {
+      throw new Error(resp);
+    }
+
     System.out.println(resp);
     int start = resp.indexOf("(");
     int end = resp.indexOf(")");
@@ -135,15 +200,26 @@ public class CSftp {
     for (int i=1;i<4;i++) {
       ip += "." + parts[i];
     }
-
     int port = Integer.parseInt(parts[4])*256 + Integer.parseInt(parts[5]);
-    System.out.println("IP: "+ip+", port: "+port);
 
     try {
       return new Socket(ip, port);
     } catch (Exception exception) {
       throw new Error("0x3A2 Data transfer connection to "+ip+" on port "+port+" failed to open.");
     }
+  }
+
+  // hasMultipleResp parses a response line and returns whether there will be
+  // multiple lines returned.
+  private static boolean hasMultipleResp(String line) {
+    int code = responseCode(line);
+    return code == 120 || code == 125 || code == 150;
+  }
+
+  // responseCode parses the response line and returns the response code.
+  private static int responseCode(String line) {
+    String code = line.substring(0, 3);
+    return Integer.parseInt(code);
   }
 
   // sendSimpleCommand sends the command and returns the first line of the
@@ -160,18 +236,25 @@ public class CSftp {
     return readMessage(end);
   }
 
+  // readMessage reads until end is reached, or the first line if end is empty.
   private static String readMessage(String end) {
     String output = "";
     String line;
     try {
       while ((line = in.readLine()) != null) {
-        output += line+"\n";
+        output += line;
         if (line.equals(end) || end.length() == 0) {
           break;
         }
+        output += "\n";
       }
     } catch (IOException e) {
-      System.out.println("TODO error reading from server");
+      System.out.println("0xFFFD Control connection I/O error, closing control connection.");
+      try {
+        client.close();
+      } catch (IOException e2) {
+        System.out.println("0xFFFF Processing error. Failed to close control connection.");
+      }
       System.exit(1);
     }
     return output;
