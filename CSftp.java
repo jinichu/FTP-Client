@@ -113,6 +113,9 @@ public class CSftp {
             File f = new File(parts[1]);
             // Check if file is read-only, or if we have write permissions to it
             // If file is read-only, we throw an error
+            try {
+              f.createNewFile();
+            } catch(IOException e){}
             if (!f.canWrite()) {
               System.out.println("0x38E Access to local file " + parts[1] + " denied.");
               continue outer;
