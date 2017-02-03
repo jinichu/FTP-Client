@@ -52,25 +52,39 @@ public class CSftp {
       System.exit(1);
     }
 
+    // Loop to get further commands from console, unless otherwise
+    // (such as errors, quitting, etc.)
     outer:
     while (true) {
       String line = c.readLine("csftp> ");
+      // Split commands at whitespaces
       String parts[] = line.split(" ");
       if (parts.length == 0) {
         System.out.println("0x001 Invalid command.");
         continue;
       }
+      /* Command will always be the first argument from console input
+      Some commands will require two parts, so we check for correct
+      number of arguments. */
       String cmd = parts[0];
       switch (cmd) {
+        // We send QUIT to the server using sendSimpleCommand
         case "quit":
-          System.out.println(sendSimpleCommand("QUIT"));
-          try {
-            client.close();
-          } catch(IOException e) {
-            System.out.println("0xFFFF Processing error. Failed to close control connection.");
+          if (parts.length != 1) {
+            System.out.println("0x002 Incorrect number of arguments.");
+            continue outer;
+          } else {
+            System.out.println(sendSimpleCommand("QUIT"));
+            try {
+              client.close();
+            } catch(IOException e) {
+              System.out.println("0xFFFF Processing error. Failed to close control connection.");
+            }
+            System.exit(0);
+            break;
           }
-          System.exit(0);
-          break;
+        // Second argument is the username
+        // We send USER [username] to the server using sendSimpleCommand
         case "user":
           if (parts.length != 2) {
             System.out.println("0x002 Incorrect number of arguments.");
@@ -79,25 +93,31 @@ public class CSftp {
             System.out.println(sendSimpleCommand("USER "+parts[1]));
             continue outer;
           }
+        // Second argument is the password
+        // We send PASS [password] to the server using sendSimpleCommand
         case "pw":
           if (parts.length != 2) {
             System.out.println("0x002 Incorrect number of arguments.");
             continue outer;
           } else {
-            System.out.println(sendSimpleCommand("PASS "+parts[1]));
+            System.out.println(sendSimpleCommand("PASS " + parts[1]));
             continue outer;
           }
+        // Second argument is the file we want to retrieve
+        // We send RETR [file] to the server using sendSimpleCommand
         case "get":
           if (parts.length != 2) {
             System.out.println("0x002 Incorrect number of arguments.");
             continue outer;
           } else {
             File f = new File(parts[1]);
+            // Check if file is read-only, or if we have write permissions to it
+            // If file is read-only, we throw an error
             if (!f.canWrite()) {
-              System.out.println("0x38E Access to local file "+parts[1]+" denied.");
+              System.out.println("0x38E Access to local file " + parts[1] + " denied.");
               continue outer;
             }
-
+            // Open a new connection with the IP address given back by the server
             Socket sock;
             try {
               sock = PASV();
@@ -105,18 +125,20 @@ public class CSftp {
               System.out.println(e.getMessage());
               continue outer;
             }
-
-            String resp = sendSimpleCommand("RETR "+parts[1]);
+            // After we've opened a new connection, we send RETR [file] to the server
+            String resp = sendSimpleCommand("RETR " + parts[1]);
             System.out.println(resp);
+            // Response code 150 means it was successful
             if (responseCode(resp) != 150) {
               continue outer;
             }
-
+            // Save file to local machine, overwriting existing file if needed
             try {
               Files.copy(sock.getInputStream(), f.toPath(), StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException err) {
               System.out.println("0x3A7 Data transfer connection I/O error, closing data connection. "+err);
             }
+            // Close socket
             try {
               sock.close();
             } catch (IOException err) {
@@ -127,45 +149,63 @@ public class CSftp {
             }
             continue outer;
           }
+        // We send FEAT 211 End to the server using sendSimpleCommand
+        // Server returns a list of features
         case "features":
-          System.out.println(sendSimpleCommand("FEAT", "211 End"));
-          continue outer;
+          if (parts.length != 1) {
+            System.out.println("0x002 Incorrect number of arguments.");
+            continue outer;
+          } else {
+            System.out.println(sendSimpleCommand("FEAT", "211 End"));
+            continue outer;
+          }
+        // Second argument is the folder we want to change directory to
+        // We send CWD [directory] to the server using sendSimpleCommand
         case "cd":
           if (parts.length != 2) {
             System.out.println("0x002 Incorrect number of arguments.");
             continue outer;
           } else {
-            System.out.println(sendSimpleCommand("CWD "+parts[1]));
+            System.out.println(sendSimpleCommand("CWD " + parts[1]));
             continue outer;
           }
+        // We send LIST to the server using sendSimpleCommand
         case "dir":
-          Socket sock;
-          try {
-            sock = PASV();
-          } catch (Error e) {
-            System.out.println(e.getMessage());
+          if (parts.length != 1) {
+            System.out.println("0x002 Incorrect number of arguments.");
+            continue outer;
+          } else {
+            // Open a new connection with the IP address given back by the server
+            Socket sock;
+            try {
+              sock = PASV();
+            } catch (Error e) {
+              System.out.println(e.getMessage());
+              continue outer;
+            }
+            String resp = sendSimpleCommand("LIST");
+            System.out.println(resp);
+            // Read out list of directories given back by the server
+            try {
+              BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()));
+              String line2;
+              while ((line2 = in.readLine()) != null) {
+                System.out.println(line2);
+              }
+            } catch (IOException err) {
+              System.out.println("0x3A7 Data transfer connection I/O error, closing data connection.");
+            }
+            // Close socket
+            try {
+              sock.close();
+            } catch (IOException err) {
+              System.out.println("0xFFFF Processing error. Failed to close data connection.");
+            }
+            if (hasMultipleResp(resp)) {
+              System.out.println(readMessage(""));
+            }
             continue outer;
           }
-          String resp = sendSimpleCommand("LIST");
-          System.out.println(resp);
-          try {
-            BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()));
-            String line2;
-            while ((line2 = in.readLine()) != null) {
-              System.out.println(line2);
-            }
-          } catch (IOException err) {
-            System.out.println("0x3A7 Data transfer connection I/O error, closing data connection.");
-          }
-          try {
-            sock.close();
-          } catch (IOException err) {
-            System.out.println("0xFFFF Processing error. Failed to close data connection.");
-          }
-          if (hasMultipleResp(resp)) {
-            System.out.println(readMessage(""));
-          }
-          continue outer;
         default:
           System.out.println("0x001 Invalid command.");
       }
@@ -182,6 +222,7 @@ public class CSftp {
       throw new Error(resp);
     }
 
+    // IP address will be given in (h1,h2,h3,h4,p1,p2) format
     System.out.println(resp);
     int start = resp.indexOf("(");
     int end = resp.indexOf(")");
@@ -207,7 +248,6 @@ public class CSftp {
       throw new Error("0x3A2 Data transfer connection to "+ip+" on port "+port+" failed to open.");
     }
   }
-
   // hasMultipleResp parses a response line and returns whether there will be
   // multiple lines returned.
   private static boolean hasMultipleResp(String line) {
