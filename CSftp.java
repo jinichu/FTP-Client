@@ -93,6 +93,9 @@ public class CSftp {
             continue outer;
           } else {
             File f = new File(parts[1]);
+            try {
+              f.createNewFile();
+            } catch(IOException e){}
             if (!f.canWrite()) {
               System.out.println("0x38E Access to local file "+parts[1]+" denied.");
               continue outer;
